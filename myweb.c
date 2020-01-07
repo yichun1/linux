@@ -1,6 +1,6 @@
 #include<stdio.h>
 #include<sys/socket.h>
-#include<sys/types.>
+#include<sys/types.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<unistd.h>
@@ -11,6 +11,14 @@
 #include<pthread.h>
 #include<sys/wait.h>
 #include<stdlib.h>
+
+#define RIO_BUFSIZE 4096
+typedef struct{
+	int rio_fd;
+	int rio_cnt;
+	char *rio_bufptr;
+	char rio_buf[RIO_BUFSIZE];
+}rio_t;
 
 void *serve_client(void *vargp);
 void process_trans(int fd);
@@ -289,4 +297,5 @@ void feed_daynamic_post(int fd,char *filename,char *cgiars){
 		waitpid(pid,&status,0);
 	}
 }
+
 
