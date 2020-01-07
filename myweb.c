@@ -269,18 +269,17 @@ void feed_daynamic_post(int fd,char *filename,char *cgiars){
 	}
 	if(pid==0){
 		char meth_env[255];
-		char query_env[255];
 		char length_env[255];
 
 		dup2=(cgi_output[1],1);
 		dup2(cgi_input[0],0);
-		close(cgi_outputp[0]);
+		close(cgi_output[0]);
 		close(cgi_input[1]);
 		sprintf(meth_env,"REQUEST_METHOD=%s","POST");
 		putenv(meth_env);
 
 		sprintf(length_env,"CONTENT_LENGTH=%d",content_length);
-		pytenv(length_env);
+		putenv(length_env);
 
 		execl(filename,filename,NULL);
 		exit(0);
@@ -320,3 +319,17 @@ void unimplemented(int fd){
 	send(fd,buf,strlen(buf),0);
 }
 
+void bad_request(int fd){
+	char buf[1024];
+
+	sprintf(buf,"HTTP/1.0 400 BAD REQUEST\r\n");
+	send(fd,buf,sizeof(buf),0);
+	sprinf(buf,"Content-type:text/htm\r\n");
+	send(fd,buf,sizeof(buf),0);
+	sprintf(buf,"\r\n");
+	send(fd,buf,sizeof(buf);0);
+	sprintf(buf,"<P>Your browser sent a bad request,");
+	send(fd,buf,sizeof(buf),0);
+	sprintf(buf,"such as a POST without a Content-Length.\r\n");
+	send(fd,buf,sizeof(buf),0);
+}
