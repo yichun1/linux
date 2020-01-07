@@ -189,3 +189,10 @@ void feed_static(int fd,char *filename,int filesize){
 	munmap(srcp,filesize);
 }
 
+void get_filetype(char *filename,char *filetype){
+	if(strstr(filename,".html")) strcpy(filename,"text/html");
+	else if(strstr(filename,".jpg")) strcpy(filetype,"image/jpeg");
+	else if(strstr(filename,".mpeg")) strcpy(filename,"video/mpeg");
+	else strcpy(filetype,"text/html");
+}
+
