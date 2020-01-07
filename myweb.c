@@ -252,7 +252,7 @@ void parse_static_uri(char *uri,char *filename){
 	char *ptr;
 	strcpy(filename,".");
 	strcat(filename,uri);
-	if(uri[strlen(uri-1)]=='/') strcat(filename,"home.html");
+	if(uri[strlen(uri)-1]=='/') strcat(filename,"home.html");
 }
 
 void parse_dynamic_uri(char *uri,char *filename,char *cgiargs){
@@ -285,22 +285,22 @@ void feed_static(int fd,char *filename,int filesize){
 }
 
 void get_filetype(char *filename,char *filetype){
-	if(strstr(filename,".html")) strcpy(filename,"text/html");
+	if(strstr(filename,".html")) strcpy(filetype,"text/html");
 	else if(strstr(filename,".jpg")) strcpy(filetype,"image/jpeg");
 	else if(strstr(filename,".mpeg")) strcpy(filename,"video/mpeg");
 	else strcpy(filetype,"text/html");
 }
 
-int getline(int fd,char *buf,int size){
+int get_line(int fd,char *buf,int size){
 	int i=0;
 	char c='\0';
 	int n;
 	while((i<size-1)&&(c!='\n')){
-		n=recv(sock,&c,1,0);
+		n=recv(fd,&c,1,0);
 		if(n>0){
 			if(c=='\r'){
-				n=recv(sock,&c,1,MSG_PEEK);
-				if(n>0&&(c=='\n')) recv(sock,&c,1,0);
+				n=recv(fd,&c,1,MSG_PEEK);
+				if(n>0&&(c=='\n')) recv(fd,&c,1,0);
 				else c='\n';
 			}
 			buf[i]=c;
