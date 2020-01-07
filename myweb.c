@@ -120,3 +120,8 @@ void process_trans(int fd){
 	}
 }
 
+int is_static(char *uri){
+	if(!struct(uri,"cgi-bin")) return 1;
+	else return 0;
+}
+
