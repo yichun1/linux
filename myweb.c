@@ -16,6 +16,8 @@
 #include<sys/mman.h>
 
 #define RIO_BUFSIZE 4096
+#define MAXLINE 4096
+#define MAXBUF 4096
 #define SERVER_STRING "Server:jdbhttpd/0.1.0\r\n"
 typedef struct{
 	int rio_fd;
@@ -23,7 +25,8 @@ typedef struct{
 	char *rio_bufptr;
 	char rio_buf[RIO_BUFSIZE];
 }rio_t;
-
+typedef struct sockaddr SA;
+void open_listen_sock(int fd);
 void *serve_client(void *vargp);
 void process_trans(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -56,7 +59,20 @@ int main(int argc,char **argv){
 		pthread_create(&tid,NULL,serve_client,conn_sock);
 	}
 }
-
+void open_listen_sock(int fd){
+	int listen_sock,optval=1;
+	struct sockaddr_in serveraddr;
+	
+	if((listen_sock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
+	if(setockopt(listen_sock,SQL_SOCKET,SO_REUSEADDR,(const void*)&optval,sizeof(int))<0) return -1;
+	bzero((char*)&serveraddr,sizeof(serveraddr));
+	serveraddr.sin_family=AF_INET;
+	serveraddr.sin_addr.s_addr=htonl(INADDR_ANY);
+	serveraddr.sin_port=htons((unsighed short)port);
+	if(bind(listen_sock,(SA*)&serveraddr,sizeof(serveraddr))<0) return -1;
+	if(listen(listen_sock,LISTENQ)<0) return -1;
+	return listen_sock;
+}
 void *serve_client(void *vargp){
 	int conn_socks=*((int *)vargp);
 	pthread_detach(pthread_self());
@@ -255,7 +271,7 @@ void feed_daynamic_post(int fd,char *filename,char *cgiars){
 		numchars=get_line(fd,buf,sizeof(buf));
 	}
 	if(content_length==-1){
-		bad_request(client);
+		bad_request(fd);
 		return;
 	}
 
