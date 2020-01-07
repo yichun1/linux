@@ -125,3 +125,21 @@ int is_static(char *uri){
 	else return 0;
 }
 
+void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *description){
+	char buf[1024],body[1024];
+	sprintf(body,"<html><title>error request</title>");
+	sprintf(body,"%s<body bgcolor=""fffff"">\r\n",body);
+	sprintf(body,"%s%s:%s\r\n",body,errnum,shortmsg);
+	sprintf(body,"%s<p>%s: %s\r\n",body,description,cause);
+	sprintf(body,"%s<hr><em>myweb Web Server</em>\r\n",body);
+	
+	sprintf(buf,"HTTP/1.0%s%s\r\n",errnum,shortmsg);
+	rio_writen(fd,buf,strlen(buf));
+	sprintf(buf,"Content-type:text/html\r\n");
+	rio_writen(fd,buf,strlen(buf));
+	sprintf(buf,"Content-length:%d\r\n\r\n",(int)srelen(body));
+	rio_writen(fd,buf,strlen(buf));
+	rio_writen(fd,body,strlen(body));
+}
+
+
