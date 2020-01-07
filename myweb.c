@@ -29,7 +29,7 @@ void parse_dynamic_uri(char *uri,char *filename,char *cgiargs);
 void feed_static(int fd,char *filename,int filesize);
 void get_filetype(char *filename,char *filetype);
 void feed_dynamic_get(int fd,char *filename,char *cgiargs);
-void feed_dynamic_post(int fd,char *filename);
+void feed_dynamic_post(int fd,char *filename,char *cgiargs);
 void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *description);
 
 int main(int argc,char **argv){
@@ -55,12 +55,12 @@ void *serve_client(void *vargp){
 	pthread_detach(pthread_self());
 	free(vargp);
 	process_trans(conn_socks);
-	close(con_socks);
+	close(conn_socks);
 	return NULL;
 }
 
 void process_trans(int fd){
-	int static_flag,cgi=0;
+	int static_flag;
 	struct stat sbuf;
 	char buf[1024],method[1024],uri[1024],version[1024];
 	char filename[1024],cgiargs[1024];
@@ -298,4 +298,25 @@ void feed_daynamic_post(int fd,char *filename,char *cgiars){
 	}
 }
 
+void unimplemented(int fd){
+	char buf[1024];
+
+	sprintf(buf,"HTTP/1.0 501 Method Not Implemented\r\n");
+	send(fd,buf,strlen(buf),0);
+
+	sprintf(buf,SERVER_STRING);
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"Content-Type:text/html\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"<HTML><HEAD><TITLE>Method Not Implemented\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"</TITLE></HEAD>\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"<BODY><P>HTTP request method not supported.\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"</BODY></HTML>\r\n");
+	send(fd,buf,strlen(buf),0);
+}
 
