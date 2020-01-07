@@ -31,7 +31,10 @@ void get_filetype(char *filename,char *filetype);
 void feed_dynamic_get(int fd,char *filename,char *cgiargs);
 void feed_dynamic_post(int fd,char *filename,char *cgiargs);
 void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *description);
-
+void bad_request(int fd);
+void unimplemented(int fd);
+void cannot_execute(int fd);
+int get_line(int fd,char *buf,int size);
 int main(int argc,char **argv){
 	int listen_sock,*conn_sock,port;
 	socklen_t clientlen=sizeof(struct sockaddr_in);
@@ -333,3 +336,16 @@ void bad_request(int fd){
 	sprintf(buf,"such as a POST without a Content-Length.\r\n");
 	send(fd,buf,sizeof(buf),0);
 }
+
+void cannot_execute(int fd){
+	char buf[1024];
+	sprintf(buf,"HTTP/1.0 500 Internal Server Error\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"Content-type:text/html\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"\r\n");
+	send(fd,buf,strlen(buf),0);
+	sprintf(buf,"<P>Error prohibited CGI execution.\r\n");
+	send(fd,buf,strlen(buf),0);
+}
+
