@@ -14,6 +14,7 @@
 #include<sys/socket.h>
 #include<fcntl.h>
 #include<sys/mman.h>
+#include<errno.h>
 
 #define RIO_BUFSIZE 4096
 #define LISTENQ 4096
@@ -30,8 +31,10 @@ typedef struct sockaddr SA;
 int open_listen_sock(int fd);
 void *serve_client(void *vargp);
 void rio_readinit(rio_t *rp,int fd);
-void rio_readlineb(rio_t *rp,void *usrbuf,size_t maxlen);
+ssize_t rio_readlineb(rio_t *rp,void *usrbuf,size_t maxlen);
 void process_trans(int fd);
+static ssize_t rio_read(rio_t *rp,char *usrbuf,size_t n);
+ssize_t rio_writen(int fd,void *usrbuf,size_t n);
 void read_requesthdrs(rio_t *rp);
 int is_static(char *uri);
 void parse_static_uri(char *uri,char *filename);
@@ -45,6 +48,7 @@ void bad_request(int fd);
 void unimplemented(int fd);
 void cannot_execute(int fd);
 int get_line(int fd,char *buf,int size);
+
 int main(int argc,char **argv){
 	int listen_sock,*conn_sock,port;
 	socklen_t clientlen=sizeof(struct sockaddr_in);
@@ -91,8 +95,26 @@ void rio_readinitb(rio_t *rp,int fd){
 	rp->rio_bufptr=rp->rio_buf;
 }
 
+static ssize_t rio_read(rio_t *rp,char *usrbuf,size_t n){
+       int cnt;
+       while(rp->rio_cnt<=0){
+	       rp->rio_cnt=read(rp->rio_fd,rp->rio_buf,sizeof(rp->rio_buf));
+	       if(rp->rio_cnt<0){
+		       if(errno!=EINTR) return -1;
+	       }
+	       else if(rp->rio_cnt==0) return 0;
+	       else rp->rio_bufptr=rp->rio_buf;
+       }
+       cnt=n;
+       if(rp->rio_cnt<n) cnt=rp->rio_cnt;
+       memcpy(usrbuf,rp->rio_bufptr,cnt);
+       rp->rio_bufptr+=cnt;
+       rp->rio_cnt-=cnt;
+       return cnt;
+}       
+
 ssize_t rio_readlineb(rio_t *r,void *usrbuf,size_t maxlen){
-	int a,rc;
+	int n,rc;
 	char c,*bufp=usrbuf;
 	for(n=1;n<maxlen;n++){
 		if((rc=rio_read(rp,&c,1))==1){
@@ -104,6 +126,21 @@ ssize_t rio_readlineb(rio_t *r,void *usrbuf,size_t maxlen){
 		}else return -1;
 	}
 	*bufp=0;
+	return n;
+}
+
+ssize_t rio_writen(int fd,void *usrbuf,size_t n){
+	size_t nleft=n;
+	ssize_t nwritten;
+	char *bufp=usrbuf;
+	while(nleft>0){
+		if((nwritten=write(fd,bufp,nleft))<=0){
+			if(errno==EINTR) nwritten=0;
+			else return -1;
+		}
+		nleft-=nwritten;
+		bufp+=nwritten;
+	}
 	return n;
 }
 
