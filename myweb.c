@@ -218,4 +218,75 @@ void feed_dynamic_get(int fd,char *filename,char *cgiars){
 	close(pfd[1]);
 }
 
+void feed_daynamic_post(int fd,char *filename,char *cgiars){
+	char buf[1024];
+	int cgi_output[2];
+	int cgi_input[2];
+	pid_t pid;
+	int status;
+	int i;
+	char c;
+	int numchars=1;
+	int content_length=-1;
+
+	buf[0]='A';
+	buf[1]='\0';
+
+	numchars=get_line(fd,buf,sizeof(buf));
+	while((numchars>0)&&strcmp("\n",buf)){
+		buf[15]='\0';
+		if(strcasecmp(buf,"Content-Length:")==0)
+			content_length=atoi(&(buf[16]));
+		numchars=get_line(client,buf,sizeof(buf));
+	}
+	if(cont_length==-1){
+		bad_request(client);
+		return;
+	}
+
+	sprintf(buf,"HTTP/1.0 200 OK\r\n");
+	send(fd,buf,strlen(buf),0);
+
+	if(pipe(cgi_output)<0){
+		cannot_execute(fd);
+		return;
+	}
+	if(pipe(cgi_input)<0){
+		cannot_execute(fd);
+		return;
+	}
+	if((pid=fork())<0){
+		cannot_execute(fd);
+		return;
+	}
+	if(pid==0){
+		char meth_env[255];
+		char query_env[255];
+		char length_env[255];
+
+		dup2=(cgi_output[1],1);
+		dup2(cgi_input[0],0);
+		close(cgi_outputp[0]);
+		close(cgi_input[1]);
+		sprintf(meth_env,"REQUEST_METHOD=%s","POST");
+		putenv(meth_env);
+
+		sprintf(length_env,"CONTENT_LENGTH=%d",content_length);
+		pytenv(length_env);
+
+		execl(filename,filename,NULL);
+		exit(0);
+	}else{
+		close(cgi_output[1]);
+		close(cgi_input[0]);
+		for(i=0;i<content_length;i++){
+			recv(fd,&c,1,0);
+			write(cgi_input[1],&c,1);
+		}
+		while(read(cgi_output[0],&c,1)>0) send(fd,&c,1,0);
+		close(cgi_output[0]);
+		close(cgi_input[1]);
+		waitpid(pid,&status,0);
+	}
+}
 
