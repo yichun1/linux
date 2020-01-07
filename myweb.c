@@ -142,4 +142,15 @@ void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *descript
 	rio_writen(fd,body,strlen(body));
 }
 
+void read_requesthdrs(rio_t *rp){
+	char buf[1024];
+
+	rio_readlineb(rp,buf,1024);
+	while(strcmp(buf,"\r\n")){
+		printf("%s",buf);
+		rio_readlineb(rp,buf,1024);
+	}
+	return;
+}
+
 
