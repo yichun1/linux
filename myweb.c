@@ -16,8 +16,9 @@
 #include<sys/mman.h>
 
 #define RIO_BUFSIZE 4096
-#define MAXLINE 4096
-#define MAXBUF 4096
+#define LISTENQ 4096
+#define MAXLINE 9000
+#define MAXBUF 9000
 #define SERVER_STRING "Server:jdbhttpd/0.1.0\r\n"
 typedef struct{
 	int rio_fd;
@@ -26,8 +27,10 @@ typedef struct{
 	char rio_buf[RIO_BUFSIZE];
 }rio_t;
 typedef struct sockaddr SA;
-void open_listen_sock(int fd);
+int open_listen_sock(int fd);
 void *serve_client(void *vargp);
+void rio_readinit(rio_t *rp,int fd);
+void rio_readlineb(rio_t *rp,void *usrbuf,size_t maxlen);
 void process_trans(int fd);
 void read_requesthdrs(rio_t *rp);
 int is_static(char *uri);
@@ -59,16 +62,16 @@ int main(int argc,char **argv){
 		pthread_create(&tid,NULL,serve_client,conn_sock);
 	}
 }
-void open_listen_sock(int fd){
+int open_listen_sock(int fd){
 	int listen_sock,optval=1;
 	struct sockaddr_in serveraddr;
 	
 	if((listen_sock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
-	if(setockopt(listen_sock,SQL_SOCKET,SO_REUSEADDR,(const void*)&optval,sizeof(int))<0) return -1;
+	if(setsockopt(listen_sock,SOL_SOCKET,SO_REUSEADDR,(const void*)&optval,sizeof(int))<0) return -1;
 	bzero((char*)&serveraddr,sizeof(serveraddr));
 	serveraddr.sin_family=AF_INET;
 	serveraddr.sin_addr.s_addr=htonl(INADDR_ANY);
-	serveraddr.sin_port=htons((unsighed short)port);
+	serveraddr.sin_port=htons((unsigned short)fd);
 	if(bind(listen_sock,(SA*)&serveraddr,sizeof(serveraddr))<0) return -1;
 	if(listen(listen_sock,LISTENQ)<0) return -1;
 	return listen_sock;
@@ -80,6 +83,28 @@ void *serve_client(void *vargp){
 	process_trans(conn_socks);
 	close(conn_socks);
 	return NULL;
+}
+
+void rio_readinitb(rio_t *rp,int fd){
+	rp->rio_fd=fd;
+	rp->rio_cnt=0;
+	rp->rio_bufptr=rp->rio_buf;
+}
+
+ssize_t rio_readlineb(rio_t *r,void *usrbuf,size_t maxlen){
+	int a,rc;
+	char c,*bufp=usrbuf;
+	for(n=1;n<maxlen;n++){
+		if((rc=rio_read(rp,&c,1))==1){
+			*bufp++=c;
+			if(c=='\n') break;
+		}else if(rc==0){
+			if(n==1) return 0;
+			else break;
+		}else return -1;
+	}
+	*bufp=0;
+	return n;
 }
 
 void process_trans(int fd){
