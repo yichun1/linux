@@ -291,6 +291,27 @@ void get_filetype(char *filename,char *filetype){
 	else strcpy(filetype,"text/html");
 }
 
+int getline(int fd,char *buf,int size){
+	int i=0;
+	char c='\0';
+	int n;
+	while((i<size-1)&&(c!='\n')){
+		n=recv(sock,&c,1,0);
+		if(n>0){
+			if(c=='\r'){
+				n=recv(sock,&c,1,MSG_PEEK);
+				if(n>0&&(c=='\n')) recv(sock,&c,1,0);
+				else c='\n';
+			}
+			buf[i]=c;
+			i++;
+		}
+		else c='\n';
+	}
+	buf[i]='\0';
+	return(i);					
+}
+
 void feed_dynamic_get(int fd,char *filename,char *cgiargs){
 	char buf[MAXLINE],*emptylist[]={NULL};
 	int pfd[2];
@@ -313,7 +334,7 @@ void feed_dynamic_get(int fd,char *filename,char *cgiargs){
 	close(pfd[1]);
 }
 
-void feed_daynamic_post(int fd,char *filename,char *cgiars){
+void feed_dynamic_post(int fd,char *filename,char *cgiars){
 	char buf[1024];
 	int cgi_output[2];
 	int cgi_input[2];
