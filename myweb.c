@@ -28,6 +28,8 @@ typedef struct{
 	char rio_buf[RIO_BUFSIZE];
 }rio_t;
 typedef struct sockaddr SA;
+extern char **environ;
+
 int open_listen_sock(int fd);
 void *serve_client(void *vargp);
 void rio_readinit(rio_t *rp,int fd);
@@ -113,7 +115,7 @@ static ssize_t rio_read(rio_t *rp,char *usrbuf,size_t n){
        return cnt;
 }       
 
-ssize_t rio_readlineb(rio_t *r,void *usrbuf,size_t maxlen){
+ssize_t rio_readlineb(rio_t *rp,void *usrbuf,size_t maxlen){
 	int n,rc;
 	char c,*bufp=usrbuf;
 	for(n=1;n<maxlen;n++){
