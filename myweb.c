@@ -81,7 +81,7 @@ void process_trans(int fd){
 		}
 
 		if(static_flag){
-			if(!S_ISREG(sbuf.st_mode))||!(S_IRUSR&sbuf.st_mode)){
+			if(!(S_ISREG(sbuf.st_mode))||!(S_IRUSR&sbuf.st_mode)){
 				error_request(fd,filename,"403","Forbidden","myweb is not permtted to read the file");
 				return;
 			}
@@ -104,7 +104,7 @@ void process_trans(int fd){
 		}
 
 		if(static_flag){
-			if(!S_ISREG(sbuf.st_mode))||!(S_IRUSR&sbuf.st_mode)){
+			if(!(S_ISREG(sbuf.st_mode))||!(S_IRUSR&sbuf.st_mode)){
 				error_request(fd,filename,"403","Forbidden","myweb is not permtted to read the file");
 				return;
 			}
@@ -153,4 +153,10 @@ void read_requesthdrs(rio_t *rp){
 	return;
 }
 
+void parse_static_uri(char *uri,char *filename){
+	char *ptr;
+	strcpy(filename,".");
+	strcat(filename,uri);
+	if(uri[strlen(uri-1)]=='/') strcat(filename,"home.html");
+}
 
