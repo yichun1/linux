@@ -11,8 +11,13 @@
 #include<pthread.h>
 #include<sys/wait.h>
 #include<stdlib.h>
+#include<sys/socket.h>
+#include<linux/slab.h>
+#include<fcntl.h>
+#include<sys/mman.h>
 
 #define RIO_BUFSIZE 4096
+#define SERVER_STRING "Server:jdbhttpd/0.1.0\r\n"
 typedef struct{
 	int rio_fd;
 	int rio_cnt;
@@ -65,8 +70,8 @@ void *serve_client(void *vargp){
 void process_trans(int fd){
 	int static_flag;
 	struct stat sbuf;
-	char buf[1024],method[1024],uri[1024],version[1024];
-	char filename[1024],cgiargs[1024];
+	char buf[MAXLINE],method[MAXLINE],uri[MAXLINE],version[MAXLINE];
+	char filename[MAXLINE],cgiargs[MAXLINE];
 	rio_t rio;
 
 	rio_readinitb(&rio,fd);
@@ -132,14 +137,14 @@ void process_trans(int fd){
 }
 
 int is_static(char *uri){
-	if(!struct(uri,"cgi-bin")) return 1;
+	if(!strstr(uri,"cgi-bin")) return 1;
 	else return 0;
 }
 
 void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *description){
-	char buf[1024],body[1024];
+	char buf[MAXLINE],body[MAXBUF];
 	sprintf(body,"<html><title>error request</title>");
-	sprintf(body,"%s<body bgcolor=""fffff"">\r\n",body);
+	sprintf(body,"%s<body bgcolor=""ffffff"">\r\n",body);
 	sprintf(body,"%s%s:%s\r\n",body,errnum,shortmsg);
 	sprintf(body,"%s<p>%s: %s\r\n",body,description,cause);
 	sprintf(body,"%s<hr><em>myweb Web Server</em>\r\n",body);
@@ -148,18 +153,18 @@ void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *descript
 	rio_writen(fd,buf,strlen(buf));
 	sprintf(buf,"Content-type:text/html\r\n");
 	rio_writen(fd,buf,strlen(buf));
-	sprintf(buf,"Content-length:%d\r\n\r\n",(int)srelen(body));
+	sprintf(buf,"Content-length:%d\r\n\r\n",(int)strlen(body));
 	rio_writen(fd,buf,strlen(buf));
 	rio_writen(fd,body,strlen(body));
 }
 
 void read_requesthdrs(rio_t *rp){
-	char buf[1024];
+	char buf[MAXLINE];
 
-	rio_readlineb(rp,buf,1024);
+	rio_readlineb(rp,buf,MAXLINE);
 	while(strcmp(buf,"\r\n")){
 		printf("%s",buf);
-		rio_readlineb(rp,buf,1024);
+		rio_readlineb(rp,buf,MAXLINE);
 	}
 	return;
 }
@@ -185,7 +190,7 @@ void parse_dynamic_uri(char *uri,char *filename,char *cgiargs){
 
 void feed_static(int fd,char *filename,int filesize){
 	int srcfd;
-	char *srcp,filetype[1024],buf[1024];
+	char *srcp,filetype[MAXLINE],buf[MAXBUF];
 	get_filetype(filename,filetype);
 	sprintf(buf,"HTTP/1.0 200 OK\r\n");
 	sprintf(buf,"%sServer:myweb Web Server\r\n",buf);
@@ -207,8 +212,8 @@ void get_filetype(char *filename,char *filetype){
 	else strcpy(filetype,"text/html");
 }
 
-void feed_dynamic_get(int fd,char *filename,char *cgiars){
-	char buf[1024],*emptylist[]={NULL};
+void feed_dynamic_get(int fd,char *filename,char *cgiargs){
+	char buf[MAXLINE],*emptylist[]={NULL};
 	int pfd[2];
 
 	sprintf(buf,"HTTP/1.0 200 OK\r\n");
@@ -224,7 +229,7 @@ void feed_dynamic_get(int fd,char *filename,char *cgiars){
 		execve(filename,emptylist,environ);
 	}
 	close(pfd[0]);
-	write(pfd[1],cgiargs,strlen(cgiargs)+);
+	write(pfd[1],cgiargs,strlen(cgiargs)+1);
 	wait(NULL);
 	close(pfd[1]);
 }
@@ -248,9 +253,9 @@ void feed_daynamic_post(int fd,char *filename,char *cgiars){
 		buf[15]='\0';
 		if(strcasecmp(buf,"Content-Length:")==0)
 			content_length=atoi(&(buf[16]));
-		numchars=get_line(client,buf,sizeof(buf));
+		numchars=get_line(fd,buf,sizeof(buf));
 	}
-	if(cont_length==-1){
+	if(content_length==-1){
 		bad_request(client);
 		return;
 	}
@@ -274,7 +279,7 @@ void feed_daynamic_post(int fd,char *filename,char *cgiars){
 		char meth_env[255];
 		char length_env[255];
 
-		dup2=(cgi_output[1],1);
+		dup2(cgi_output[1],1);
 		dup2(cgi_input[0],0);
 		close(cgi_output[0]);
 		close(cgi_input[1]);
@@ -327,10 +332,10 @@ void bad_request(int fd){
 
 	sprintf(buf,"HTTP/1.0 400 BAD REQUEST\r\n");
 	send(fd,buf,sizeof(buf),0);
-	sprinf(buf,"Content-type:text/htm\r\n");
+	sprintf(buf,"Content-type:text/htm\r\n");
 	send(fd,buf,sizeof(buf),0);
 	sprintf(buf,"\r\n");
-	send(fd,buf,sizeof(buf);0);
+	send(fd,buf,sizeof(buf),0);
 	sprintf(buf,"<P>Your browser sent a bad request,");
 	send(fd,buf,sizeof(buf),0);
 	sprintf(buf,"such as a POST without a Content-Length.\r\n");
