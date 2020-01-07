@@ -12,7 +12,6 @@
 #include<sys/wait.h>
 #include<stdlib.h>
 #include<sys/socket.h>
-#include<linux/slab.h>
 #include<fcntl.h>
 #include<sys/mman.h>
 
