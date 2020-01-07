@@ -40,3 +40,12 @@ int main(int argc,char **argv){
 		pthread_create(&tid,NULL,serve_client,conn_sock);
 	}
 }
+
+void *serve_client(void *vargp){
+	int conn_socks=*((int *)vargp);
+	pthread_detach(pthread_self());
+	free(vargp);
+	process_trans(conn_socks);
+	close(con_socks);
+	return NULL;
+}
