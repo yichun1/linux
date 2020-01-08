@@ -28,7 +28,7 @@ typedef struct{
 	char rio_buf[RIO_BUFSIZE];
 }rio_t;
 typedef struct sockaddr SA;
-extern char **environ;
+char *environ[]={0,NULL};
 
 int open_listen_sock(int fd);
 void *serve_client(void *vargp);
@@ -38,13 +38,13 @@ void process_trans(int fd);
 static ssize_t rio_read(rio_t *rp,char *usrbuf,size_t n);
 ssize_t rio_writen(int fd,void *usrbuf,size_t n);
 void read_requesthdrs(rio_t *rp);
+ssize_t rio_readn(rio_t *rp,void *usrbuf,size_t n);
 int is_static(char *uri);
 void parse_static_uri(char *uri,char *filename);
 void parse_dynamic_uri(char *uri,char *filename,char *cgiargs);
 void feed_static(int fd,char *filename,int filesize);
 void get_filetype(char *filename,char *filetype);
-void feed_dynamic_get(int fd,char *filename,char *cgiargs);
-void feed_dynamic_post(int fd,char *filename,char *cgiargs);
+void feed_dynamic(int fd,char *filename,char *cgiargs);
 void error_request(int fd,char *cause,char *errnum,char *shortmsg,char *description);
 void bad_request(int fd);
 void unimplemented(int fd);
@@ -131,6 +131,23 @@ ssize_t rio_readlineb(rio_t *rp,void *usrbuf,size_t maxlen){
 	return n;
 }
 
+ssize_t rio_readn(rio_t *rp,void *usrbuf,size_t n){
+size_t nleft=n;
+ssize_t nread;
+char *bufp=usrbuf;
+while(nleft>0){
+if((nread=rio_read(rp,bufp,nleft))<0){
+if(errno==EINTR) nread=0;
+else return -1;
+}
+else if(nread==0) break;
+nleft-=nread;
+bufp+=nread;
+}
+return (n-nleft);
+}
+
+
 ssize_t rio_writen(int fd,void *usrbuf,size_t n){
 	size_t nleft=n;
 	ssize_t nwritten;
@@ -149,55 +166,55 @@ ssize_t rio_writen(int fd,void *usrbuf,size_t n){
 void process_trans(int fd){
 	int static_flag;
 	struct stat sbuf;
+int content_length,numchars=1;
 	char buf[MAXLINE],method[MAXLINE],uri[MAXLINE],version[MAXLINE];
-	char filename[MAXLINE],cgiargs[MAXLINE];
+	char filename[MAXLINE],cgiargs[MAXLINE],cgiarg[MAXLINE];
 	rio_t rio;
 
 	rio_readinitb(&rio,fd);
 	rio_readlineb(&rio,buf,1024);
 	sscanf(buf,"%s %s %s",method,uri,version);
+       
+        static_flag=is_static(uri);
+	if(static_flag)
+		parse_static_uri(uri,filename);
+	else
+		parse_dynamic_uri(uri,filename,cgiargs);
 	if(strcasecmp(method,"GET")&&strcasecmp(method,"POST")){
 		unimplemented(fd);
 		return;
 	}
 
-	read_requesthdrs(&rio);
-
-	static_flag=is_static(uri);
-	if(static_flag)
-		parse_static_uri(uri,filename);
-	else
-		parse_dynamic_uri(uri,filename,cgiargs);
-
+	
 	if(strcasecmp(method,"POST")==0){
 		if(stat(filename,&sbuf)<0){
 			error_request(fd,filename,"404","Not found","myweb could not find this file");
 			return;
 		}
 
-		if(static_flag){
-			if(!(S_ISREG(sbuf.st_mode))||!(S_IRUSR&sbuf.st_mode)){
-				error_request(fd,filename,"403","Forbidden","myweb is not permtted to read the file");
-				return;
-			}
-			feed_static(fd,filename,sbuf.st_size);
+		if(!(S_ISREG(sbuf.st_mode))||!(S_IXUSR&sbuf.st_mode)){
+			error_request(fd,filename,"403","Forbidden","myweb could not run the CGI program");
+			return;
 		}
-		else{
-			if(!(S_ISREG(sbuf.st_mode))||!(S_IXUSR&sbuf.st_mode)){
-				error_request(fd,filename,"403","Forbidden","myweb could not run the CGI program");
-				return;
-			}
-			feed_dynamic_post(fd,filename,cgiargs);
-		}
+	numchars=rio_readlineb(&rio,buf,1024);
+while((numchars>0)&&strcmp("\r\n",buf)){
+		buf[15]='\0';
+		if(strcasecmp(buf,"Content-Length:")==0)
+			content_length=atoi(&(buf[16]));
+		numchars=rio_readlineb(&rio,buf,1024);
+	}
+rio_readn(&rio,cgiarg,content_length);
+	feed_dynamic(fd,filename,cgiarg);
+
 	}
 
 	if(strcasecmp(method,"GET")==0){
+                read_requesthdrs(&rio);
 
-		if(stat(filename,&sbuf)<0){
+                if(stat(filename,&sbuf)<0){
 			error_request(fd,filename,"404","Not found","myweb could not find this file");
 			return;
 		}
-
 		if(static_flag){
 			if(!(S_ISREG(sbuf.st_mode))||!(S_IRUSR&sbuf.st_mode)){
 				error_request(fd,filename,"403","Forbidden","myweb is not permtted to read the file");
@@ -210,13 +227,13 @@ void process_trans(int fd){
 				error_request(fd,filename,"403","Forbidden","myweb could not run the CGI program");
 				return;
 			}
-			feed_dynamic_get(fd,filename,cgiargs);
+			feed_dynamic(fd,uri,cgiargs);
 		}
 	}
 }
 
 int is_static(char *uri){
-	if(!strstr(uri,"cgi-bin")) return 1;
+	if(!strstr(uri,"cgi")) return 1;
 	else return 0;
 }
 
@@ -300,7 +317,7 @@ int get_line(int fd,char *buf,int size){
 		if(n>0){
 			if(c=='\r'){
 				n=recv(fd,&c,1,MSG_PEEK);
-				if(n>0&&(c=='\n')) recv(fd,&c,1,0);
+				if((n>0)&&(c=='\n')) recv(fd,&c,1,0);
 				else c='\n';
 			}
 			buf[i]=c;
@@ -312,7 +329,7 @@ int get_line(int fd,char *buf,int size){
 	return(i);					
 }
 
-void feed_dynamic_get(int fd,char *filename,char *cgiargs){
+void feed_dynamic(int fd,char *filename,char *cgiargs){
 	char buf[MAXLINE],*emptylist[]={NULL};
 	int pfd[2];
 
@@ -320,89 +337,22 @@ void feed_dynamic_get(int fd,char *filename,char *cgiargs){
 	rio_writen(fd,buf,strlen(buf));
 	sprintf(buf,"Server:myweb Web Server\r\n");
 	rio_writen(fd,buf,strlen(buf));
+        sprintf(buf,"Content-Type:text/html\r\n");
+	rio_writen(fd,buf,strlen(buf));
+	sprintf(buf,"\r\n");
+	rio_writen(fd,buf,strlen(buf));
 	
 	pipe(pfd);
 	if(fork()==0){
 		close(pfd[1]);
 		dup2(pfd[0],STDIN_FILENO);
 		dup2(fd,STDOUT_FILENO);
-		execve(filename,emptylist,environ);
+		execve(filename,emptylist,environ);//unimplemented(fd);
 	}
 	close(pfd[0]);
 	write(pfd[1],cgiargs,strlen(cgiargs)+1);
 	wait(NULL);
 	close(pfd[1]);
-}
-
-void feed_dynamic_post(int fd,char *filename,char *cgiars){
-	char buf[1024];
-	int cgi_output[2];
-	int cgi_input[2];
-	pid_t pid;
-	int status;
-	int i;
-	char c;
-	int numchars=1;
-	int content_length=-1;
-
-	buf[0]='A';
-	buf[1]='\0';
-
-	numchars=get_line(fd,buf,sizeof(buf));
-	while((numchars>0)&&strcmp("\n",buf)){
-		buf[15]='\0';
-		if(strcasecmp(buf,"Content-Length:")==0)
-			content_length=atoi(&(buf[16]));
-		numchars=get_line(fd,buf,sizeof(buf));
-	}
-	if(content_length==-1){
-		bad_request(fd);
-		return;
-	}
-
-	sprintf(buf,"HTTP/1.0 200 OK\r\n");
-	send(fd,buf,strlen(buf),0);
-
-	if(pipe(cgi_output)<0){
-		cannot_execute(fd);
-		return;
-	}
-	if(pipe(cgi_input)<0){
-		cannot_execute(fd);
-		return;
-	}
-	if((pid=fork())<0){
-		cannot_execute(fd);
-		return;
-	}
-	if(pid==0){
-		char meth_env[255];
-		char length_env[255];
-
-		dup2(cgi_output[1],1);
-		dup2(cgi_input[0],0);
-		close(cgi_output[0]);
-		close(cgi_input[1]);
-		sprintf(meth_env,"REQUEST_METHOD=%s","POST");
-		putenv(meth_env);
-
-		sprintf(length_env,"CONTENT_LENGTH=%d",content_length);
-		putenv(length_env);
-
-		execl(filename,filename,NULL);
-		exit(0);
-	}else{
-		close(cgi_output[1]);
-		close(cgi_input[0]);
-		for(i=0;i<content_length;i++){
-			recv(fd,&c,1,0);
-			write(cgi_input[1],&c,1);
-		}
-		while(read(cgi_output[0],&c,1)>0) send(fd,&c,1,0);
-		close(cgi_output[0]);
-		close(cgi_input[1]);
-		waitpid(pid,&status,0);
-	}
 }
 
 void unimplemented(int fd){
