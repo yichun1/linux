@@ -132,19 +132,19 @@ ssize_t rio_readlineb(rio_t *rp,void *usrbuf,size_t maxlen){
 }
 
 ssize_t rio_readn(rio_t *rp,void *usrbuf,size_t n){
-size_t nleft=n;
-ssize_t nread;
-char *bufp=usrbuf;
-while(nleft>0){
-if((nread=rio_read(rp,bufp,nleft))<0){
-if(errno==EINTR) nread=0;
-else return -1;
-}
-else if(nread==0) break;
-nleft-=nread;
-bufp+=nread;
-}
-return (n-nleft);
+	size_t nleft=n;
+	ssize_t nread;
+	char *bufp=usrbuf;
+	while(nleft>0){
+	if((nread=rio_read(rp,bufp,nleft))<0){
+		if(errno==EINTR) nread=0;
+	else return -1;
+	}
+	else if(nread==0) break;
+		nleft-=nread;
+		bufp+=nread;
+	}
+	return (n-nleft);
 }
 
 
@@ -166,7 +166,7 @@ ssize_t rio_writen(int fd,void *usrbuf,size_t n){
 void process_trans(int fd){
 	int static_flag;
 	struct stat sbuf;
-int content_length,numchars=1;
+	int content_length,numchars=1;
 	char buf[MAXLINE],method[MAXLINE],uri[MAXLINE],version[MAXLINE];
 	char filename[MAXLINE],cgiargs[MAXLINE],cgiarg[MAXLINE];
 	rio_t rio;
@@ -197,15 +197,14 @@ int content_length,numchars=1;
 			return;
 		}
 	numchars=rio_readlineb(&rio,buf,1024);
-while((numchars>0)&&strcmp("\r\n",buf)){
+	while((numchars>0)&&strcmp("\r\n",buf)){
 		buf[15]='\0';
 		if(strcasecmp(buf,"Content-Length:")==0)
 			content_length=atoi(&(buf[16]));
 		numchars=rio_readlineb(&rio,buf,1024);
 	}
-rio_readn(&rio,cgiarg,content_length);
+	rio_readn(&rio,cgiarg,content_length);
 	feed_dynamic(fd,filename,cgiarg);
-
 	}
 
 	if(strcasecmp(method,"GET")==0){

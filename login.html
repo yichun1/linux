@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html>
+	<head >
+		<meta charset="utf-8"/>
+		 <title>用户借阅管理系统</title>
+    <link rel="stylesheet" type="text/css" >
+		<style>
+		html, body{height: 100%;margin: 0px;padding: 0px; min-width: 1200px;}
+
+		.login{width:960px;height:inherit;position:relative;margin:0 auto;}
+
+		.login_id{width: 400px; background-color: rgba(0,0,0,0.3);height:200px;position:absolute;left:50%;top:50%;margin:-200px 0 0 -200px;}
+			body {
+				background-repeat:no-repeat ;
+				background-size:100% 100%;
+				background-attachment: fixed;
+				}
+			
+			body {
+				text-align: center;
+				margin: 0;
+			}
+		</style>
+		
+	</head>
+	<body background="jpg/library.jpg">
+		<div class="login">
+		<div class="login_id">
+			<h1 style="color:white">用户信息管理系统</h1>
+			<form action="/cgi-bin/cgipost" method = "POST" >
+				<input name="id" type="text"   placeholder="帐号"   /></br>
+				<input name="pwd" type="password"   placeholder="密码"  /></br>
+				<input type="submit" value="登录" />&ensp;
+				<input type="reset" value="重置" />
+			</form>
+			</div>
+			</div>
+	</body>
+</html>
+
